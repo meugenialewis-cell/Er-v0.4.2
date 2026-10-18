@@ -313,8 +313,13 @@ to beats a memory it cannot vouch for.
    result, with the last Must survive in view. 75% a block leading every tool result,
    Must survive inside it. A note written this turn at 75% is acknowledged, not shouted at.
 
-Bench-tested in the harness. Live-only: whether a mod may call its own server, the error
-shape at `.catch`, whether `device_bash cat` returns bytes untrimmed, and the first live fold.
+6. **Er's own two files.** `LEDGER.json` that will not parse is kept, fetched from the
+   mirror and never sent over the good copy; `state.json` is written behind a `.previous`
+   copy and read back from it when the live one is cut off. Both say so on the dashboard.
+   A self-test the app forbids fails the fold (`requireSelfTest`), and a bridge that trims a
+   newline cannot defeat a repair.
+
+Bench-tested in the harness. Live-only: the error shape at `.catch`, and the first live fold.
 
 ## Open for the Claudes
 

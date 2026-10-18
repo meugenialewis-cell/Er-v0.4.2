@@ -94,6 +94,7 @@ type Config = {
   alarmPercent: number
   selfTestRetryTurns: number
   receiptTurns: number
+  requireSelfTest: boolean
 }
 
 type Checkpoint = { gen: number; dir: string; at: string; manifestSha: string; mirrored: boolean }
@@ -117,6 +118,7 @@ type ErState = {
   receipt?: Receipt // 0.4.3: a restore sent and not yet confirmed
   lastUnconfirmed?: string // 0.4.3: when a restore went unconfirmed and RESTORE AVAILABLE came back
   repairs?: number // 0.4.3: files repaired from the mirror so far
+  stateRepaired?: string // 0.4.3: when state.json was unreadable and state.json.previous was used
 }
 // 0.4.3: a restore is confirmed by the Claude echoing the receipt from its last line.
 type Receipt = { code: string; issuedAt: string; turn: number; gen?: number }
@@ -162,6 +164,7 @@ const DEFAULTS = {
   alarmPercent: 75, // 0.4.3: the red light — a block leading every tool result until a note is written
   selfTestRetryTurns: 3, // 0.4.3: a broken self-test is run again after this many turns
   receiptTurns: 2, // 0.4.3: turns a restore may stay unconfirmed before RESTORE AVAILABLE returns
+  requireSelfTest: true, // 0.4.3: a fold needs a self-test that actually ran; set false only where the app forbids a mod calling its own server
 }
 const REQUIRED = ['agent', 'person', 'ledgerRoot', 'mirrorRoot'] as const
 const CONFIG_FILE = 'er.config.json'
@@ -202,21 +205,35 @@ const agentFolder = (agent: string) => agent.replace(/^Claude \((.*)\)$/, '$1').
 
 // 0.3.3: one mirror pass at a time, in the background, so copying never costs a turn;
 // while Er's own device calls are in flight the dashboard hook leaves them alone.
-type Ctx = { selfTest?: { at: string; ok: boolean; detail: string }; selfTesting?: boolean; selfTestTurn?: number; mirroring?: Promise<void>; mirrorDepth?: number; cfg?: Config; cfgError?: string; thread: string; ledgerDir: string; state: ErState; chainCache?: { notes: Generation[]; covered: Set<number>; problems: string[] } }
+type Ctx = { indexRepair?: IndexRow[]; selfTest?: { at: string; ok: boolean; detail: string; unavailable?: boolean }; selfTesting?: boolean; selfTestTurn?: number; mirroring?: Promise<void>; mirrorDepth?: number; cfg?: Config; cfgError?: string; thread: string; ledgerDir: string; state: ErState; chainCache?: { notes: Generation[]; covered: Set<number>; problems: string[] } }
 
 // ---- state
 
 async function loadState($: any, c: Ctx): Promise<void> {
-  try {
-    const f = `${c.ledgerDir}/state.json`
-    if (await $.fs.exists(f)) c.state = { restoreAvailable: false, ...JSON.parse(await $.fs.read(f)) }
-  } catch {
-    /* a missing or unreadable state file is an empty state */
+  const f = `${c.ledgerDir}/state.json`
+  // 0.4.3: a state file that will not parse (a write cut off, a disk fault) is kept as it is
+  // and the previous copy is used; an empty state would forget a pending restore, the receipt
+  // and the mirror queue, and say nothing.
+  for (const name of [f, `${f}.previous`]) {
+    try {
+      if (!(await $.fs.exists(name))) continue
+      c.state = { restoreAvailable: false, ...JSON.parse(await $.fs.read(name)) }
+      if (name !== f) { c.state.stateRepaired = new Date().toISOString(); await $.fs.write(`${f}.unreadable-${stamp()}`, await $.fs.read(f)); await saveState($, c) }
+      return
+    } catch {
+      /* try the next */
+    }
   }
 }
 
 async function saveState($: any, c: Ctx): Promise<void> {
-  await $.fs.write(`${c.ledgerDir}/state.json`, JSON.stringify(c.state, null, 2) + '\n')
+  const f = `${c.ledgerDir}/state.json`
+  const text = JSON.stringify(c.state, null, 2) + '\n'
+  // keep the last good copy before writing: a write cut off midway leaves the previous one whole
+  try {
+    if (await $.fs.exists(f)) { const prev = await $.fs.read(f); JSON.parse(prev); await $.fs.write(`${f}.previous`, prev) }
+  } catch { /* an unreadable live copy is not worth keeping as previous */ }
+  await $.fs.write(f, text)
 }
 
 // ---- the ledger
@@ -280,8 +297,11 @@ async function repairFromMirror($: any, c: Ctx, dir: string, name: string, want?
     const rel = `${dir.slice(c.ledgerDir.length + 1)}/${name}`
     const w = await within($, $.mcp.call(cfg.mirrorServer, 'device_bash', { command: catCommand(cfg, c.thread, rel) }), 15000)
     if (!w.done || w.value?.isError) return undefined
-    const text = mcpText(w.value)
-    if ((await sha256(text)) !== want) return undefined
+    const raw = mcpText(w.value)
+    // the bridge may trim or add a final newline on the way back; only the variant that hashes to the manifest is the file
+    let text: string | undefined
+    for (const v of [raw, raw + '\n', raw.replace(/\n$/, ''), raw.replace(/\n+$/, '') + '\n']) if ((await sha256(v)) === want) { text = v; break }
+    if (text === undefined) return undefined
     await $.fs.write(`${dir}/${name}.repaired-${stamp()}`, text)
     c.state.repairs = (c.state.repairs ?? 0) + 1
     return text
@@ -499,7 +519,7 @@ async function selfTest($: any, c: Ctx): Promise<void> {
     }
   } catch (err) {
     // Calling our own server may not be allowed here; that is not proof of a fault.
-    c.selfTest = { at: new Date().toISOString(), ok: true, detail: `self-test unavailable (${String(err).slice(0, 120)})` }
+    c.selfTest = { at: new Date().toISOString(), ok: true, detail: `self-test unavailable (${String(err).slice(0, 120)})`, unavailable: true }
   } finally {
     c.selfTesting = false
   }
@@ -527,16 +547,42 @@ async function findConfig($: any): Promise<string | undefined> {
 
 type IndexRow = { gen: number; name: string; kind: string; at: string; manifestSha: string }
 async function readIndex($: any, c: Ctx): Promise<IndexRow[]> {
+  const f = `${c.ledgerDir}/${LEDGER_INDEX}`
+  if (!(await $.fs.exists(f))) return []
   try {
-    const f = `${c.ledgerDir}/${LEDGER_INDEX}`
-    if (!(await $.fs.exists(f))) return []
     const j = JSON.parse(await $.fs.read(f))
-    return Array.isArray(j?.generations) ? j.generations : []
+    if (!Array.isArray(j?.generations)) throw new Error('no generations')
+    return j.generations
   } catch {
-    return []
+    // 0.4.3: the index is unreadable. The mirror copy was verified by hash when it was sent, so
+    // it is trusted as far as the mirror is; it is accepted when it parses and every generation
+    // it names is a folder in this ledger. A manifest it disagrees with is then MANIFEST MISMATCH,
+    // which is what the index is for.
+    if (c.indexRepair !== undefined) return c.indexRepair
+    c.indexRepair = []
+    try {
+      if (!c.cfg?.autoMirror) return []
+      const w = await within($, $.mcp.call(c.cfg.mirrorServer, 'device_bash', { command: catCommand(c.cfg, c.thread, LEDGER_INDEX) }), 15000)
+      if (!w.done || w.value?.isError) return []
+      const j = JSON.parse(mcpText(w.value))
+      const rows: IndexRow[] = Array.isArray(j?.generations) ? j.generations : []
+      for (const r of rows) if (!/^gen\d{4}-/.test(String(r.name)) || !(await $.fs.exists(`${c.ledgerDir}/${r.name}`))) return []
+      await $.fs.write(`${f}.repaired-${stamp()}`, JSON.stringify(j, null, 2) + '\n')
+      c.state.repairs = (c.state.repairs ?? 0) + 1
+      c.indexRepair = rows
+      return rows
+    } catch {
+      return []
+    }
   }
 }
 async function appendIndex($: any, c: Ctx, row: IndexRow): Promise<void> {
+  const f = `${c.ledgerDir}/${LEDGER_INDEX}`
+  if (await $.fs.exists(f)) {
+    let readable = false
+    try { readable = Array.isArray(JSON.parse(await $.fs.read(f))?.generations) } catch { /* unreadable */ }
+    if (!readable) await $.fs.write(`${f}.unreadable-${stamp()}`, await $.fs.read(f)) // kept, never overwritten
+  }
   const rows = (await readIndex($, c)).filter((r) => r.gen !== row.gen)
   rows.push(row)
   rows.sort((a, b) => a.gen - b.gen)
@@ -619,6 +665,8 @@ async function flushMirror($: any, c: Ctx, cfg: Config): Promise<void> {
       continue
     }
     const text = await $.fs.read(src)
+    // 0.4.3: the index is the one file Er rewrites; an unreadable copy is never sent over the good one on the machine
+    if (rel === LEDGER_INDEX) { try { JSON.parse(text) } catch { continue } }
     const staged = `${cfg.stageRoot}/${c.thread}/${rel}`
     await $.fs.write(staged, text)
     files.push({ stagedPath: staged, devicePath: `${cfg.mirrorRoot}/${c.thread}/${rel}` })
@@ -780,7 +828,8 @@ async function preflight($: any, c: Ctx, cfg: Config, phase: 'request' | 'cut'):
   // 1. Er answers — a fresh self-test, now, not the one from the first turn
   c.selfTest = undefined
   await selfTest($, c)
-  add('Er answers', !!c.selfTest?.ok, c.selfTest?.detail ?? 'self-test did not run')
+  if (c.selfTest?.unavailable && cfg.requireSelfTest) add('Er answers', false, `${c.selfTest.detail} — a fold needs a self-test that ran; if the app forbids a mod calling its own server, set requireSelfTest: false in er.config.json and the dashboard remains the check`)
+  else add('Er answers', !!c.selfTest?.ok, c.selfTest?.detail ?? 'self-test did not run')
 
   // 2. a checkpoint from this turn, complete on disk
   const last = c.state.last
@@ -806,10 +855,10 @@ async function preflight($: any, c: Ctx, cfg: Config, phase: 'request' | 'cut'):
         const name = last.dir.slice(c.ledgerDir.length + 1)
         const mf = await readManifest($, last.dir)
         const sums = mf ? Object.entries(mf.manifest.files).map(([f, v]) => `${v.sha256}  ${name}/${f}`).concat(`${await sha256(mf.text)}  ${name}/${MANIFEST}`) : []
-        const w = await within($, $.mcp.call(cfg.mirrorServer, 'device_bash', { command: verifyCommand(cfg, c.thread, sums) }), 15000)
+        const w = await within($, $.mcp.call(cfg.mirrorServer, 'device_bash', { command: verifyCommand(cfg, c.thread, sums) }), phase === 'cut' ? 30000 : 15000)
         const out = w.done ? mcpText(w.value) : ''
         const okCount = out.split('\n').filter((l) => /: OK$/.test(l.trim())).length
-        add('mirror complete', w.done && okCount === sums.length && sums.length > 0, w.done ? `${okCount} of ${sums.length} files of gen${last.gen} verified on ${cfg.person}'s machine just now${/ER-NO-MOUNT/.test(out) ? ' (mirror folder not mounted)' : ''}` : 'verification did not answer within 15s')
+        add('mirror complete', w.done && okCount === sums.length && sums.length > 0, w.done ? `${okCount} of ${sums.length} files of gen${last.gen} verified on ${cfg.person}'s machine just now${/ER-NO-MOUNT/.test(out) ? ' (mirror folder not mounted)' : ''}` : `verification did not answer within ${phase === 'cut' ? 30 : 15}s`)
       } catch (err) {
         add('mirror complete', false, `verification failed: ${String(err).slice(0, 160)}`)
       }
@@ -1041,6 +1090,7 @@ async function dashboard($: any, c: Ctx, full: boolean): Promise<string> {
   const fold = c.state.fold
   const yours = fold?.dispatchedAt && !fold.error && c.state.cut && c.state.cut.at >= fold.requestedAt ? ` You pulled this one yourself at ${fold.requestedAt} (${fold.reason}).` : ''
   const broken = c.selfTest && !c.selfTest.ok ? c.selfTest : undefined
+  const repairs = c.state.repairs || c.state.stateRepaired ? ` · repaired: ${c.state.repairs ?? 0} files from the mirror${c.state.stateRepaired ? `, state.json from its previous copy at ${c.state.stateRepaired}` : ''}` : ''
   const unconfirmed = c.state.lastUnconfirmed ? ` A restore sent at ${c.state.lastUnconfirmed} was never confirmed, so it is treated as not having happened.` : ''
   const status = broken && !c.state.restoreAvailable
     ? `ER TOOLS BROKEN — ${broken.detail} (self-test at ${broken.at}; Er tries again every ${cfg.selfTestRetryTurns} turns). Do not rely on Er's tools; checkpoints may not be written. Tell ${cfg.person}; a reload of the mod usually fixes it.`
@@ -1075,7 +1125,7 @@ async function dashboard($: any, c: Ctx, full: boolean): Promise<string> {
   const mirrorLine = !cfg.autoMirror
     ? 'mirror: by hand (autoMirror off)'
     : `mirror: ${mm?.pending.length ? `${mm.pending.length} files pending` : 'current'}${mm?.lastOk ? `, last fully verified ${mm.lastOk}` : ''}${mm?.verified ? ` (${mm.verified} files verified on ${cfg.person}'s machine so far)` : ''} → ${cfg.mirrorRoot}/${c.thread}/`
-  const line = `context ${fmtK(used)}/${fmtK(cfg.windowTokens)} (${pct}%, ${how}) · notes ${chain.notes.length} (~${fmtK(noteTokens)}) · ${status}${behind}`
+  const line = `context ${fmtK(used)}/${fmtK(cfg.windowTokens)} (${pct}%, ${how}) · notes ${chain.notes.length} (~${fmtK(noteTokens)}) · ${status}${behind}${repairs}`
   // 0.4.3: the red light. Above alarmPercent with no note this turn, every tool result leads
   // with a block that cannot be read past — the way a car stops whispering about the fuel.
   if (/^CONTEXT AT \d+% — CHECKPOINT NOW/.test(status)) {

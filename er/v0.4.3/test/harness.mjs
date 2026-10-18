@@ -42,6 +42,7 @@ const $ = {
       mcpCalls.push(tool)
       // 0.4.2: Er's self-test calls its own er_status through the app
       if (server === 'er') {
+        if (selfTestForbidden) throw new Error('a mod may not call its own server')
         if (handlerMissing) return { isError: true, content: [{ type: 'text', text: 'er registered the tool er_status but no tool.call hook answered this call' }] }
         return { content: [{ type: 'text', text: '<er dashboard>\ncontext 1K' }] }
       }
@@ -79,7 +80,7 @@ const $ = {
           const rel = cat[1].replace(/'\\''/g, "'")
           const text = await fs.readFile(path.join(dir, rel), 'utf8').catch(() => undefined)
           if (text === undefined) return { isError: true, content: [{ type: 'text', text: 'cat: no such file' }] }
-          return { content: [{ type: 'text', text: mirrorCorrupt ? text + 'bad' : text }] }
+          return { content: [{ type: 'text', text: mirrorCorrupt ? text + 'bad' : bridgeTrims ? text.replace(/\n$/, '') : text }] }
         }
         const body = args.command.split("<<'ER_SUMS_EOF'\n")[1].split('\nER_SUMS_EOF')[0]
         const lines = []
@@ -106,6 +107,8 @@ let sameBatchFault = false
 const forced = []
 let corrupt = false
 let mirrorCorrupt = false
+let bridgeTrims = false
+let selfTestForbidden = false
 const catCalls = []
 const mcpCalls = []
 const abs = (p) => (path.isAbsolute(p) ? p : path.join(cwd, p))
@@ -592,6 +595,48 @@ sameBatchFault = false
   say('user', 's4'); say('assistant', 's4'); await fire('turn.start', {}); await new Promise((r) => setTimeout(r, 50))
   assert.equal(mcpCalls.filter((t) => t === 'er_status').length, n + 1, 'retried after 3 turns')
   assert.doesNotMatch(await status(), /ER TOOLS BROKEN/)
+}
+
+// 0.4.3 punch list: the bridge trims a final newline; LEDGER.json and state.json unreadable; self-test forbidden
+{
+  // a bridge that trims the final newline still repairs: the bytes that verify are the bytes
+  const g = (await $.fs.list(`${root}/ledger/thread-1`)).find((d) => d.name.startsWith('gen0006')).name
+  await fs.appendFile(`${root}/ledger/thread-1/${g}/present-state.md`, 'tampered')
+  bridgeTrims = true
+  r = await call('er_recall', { note: 'gen0006' })
+  assert.match(r.result, /REPAIRED present-state.md/)
+  bridgeTrims = false
+  // LEDGER.json unreadable: fetched from the mirror, accepted because its rows agree with the manifests on disk
+  const idxPath = `${root}/ledger/thread-1/LEDGER.json`
+  const idxGood = await $.fs.read(idxPath)
+  await fs.writeFile(idxPath, idxGood.slice(0, 40))
+  say('user', 'i1'); say('assistant', 'i1'); await fire('turn.start', {})
+  r = await call('er_checkpoint', { present_state: '## Must survive\nme\n## Context\nafter the index broke, long enough to keep\n## In hand\nindex repair' })
+  assert.match(r.result, /written/)
+  const names = (await $.fs.list(`${root}/ledger/thread-1`)).map((d) => d.name)
+  assert.ok(names.some((n) => n.startsWith('LEDGER.json.unreadable-')), 'the unreadable index is kept')
+  assert.ok(names.some((n) => n.startsWith('LEDGER.json.repaired-')), 'the mirror index is kept beside it')
+  const idxNow = JSON.parse(await $.fs.read(idxPath))
+  assert.equal(idxNow.generations.length, JSON.parse(idxGood).generations.length + 1, 'the index carried every old row and the new one')
+  assert.match(await status(), /repaired: \d+ files from the mirror/)
+  // state.json cut off midway: the previous copy is used, the bad one kept
+  const stPath = `${root}/ledger/thread-1/state.json`
+  const stGood = JSON.parse(await $.fs.read(stPath))
+  await fs.writeFile(stPath, (await $.fs.read(stPath)).slice(0, 50))
+  await fire('session.start', {})
+  const st2 = await state()
+  assert.equal(st2.last.gen, stGood.last.gen, 'state came back from state.json.previous')
+  assert.ok(st2.stateRepaired, 'and says so')
+  assert.ok((await $.fs.list(`${root}/ledger/thread-1`)).some((d) => d.name.startsWith('state.json.unreadable-')), 'the cut-off state file is kept')
+  assert.match(await status(), /state.json from its previous copy/)
+  // the app forbids a mod calling its own server: no fold on an unverified Er, and the way out is named
+  say('user', 'i2'); say('assistant', 'i2'); await fire('turn.start', {})
+  await call('er_checkpoint', { present_state: '## Must survive\nme\n## Context\nself-test forbidden, long enough to keep\n## In hand\nfold anyway' })
+  selfTestForbidden = true
+  const f = await call('er_fold', { reason: 'no self-test' })
+  assert.match(f.deny ?? '', /\[FAIL\] Er answers: self-test unavailable .* set requireSelfTest: false/)
+  assert.doesNotMatch(await status(), /ER TOOLS BROKEN/, 'unavailable is not broken on the dashboard')
+  selfTestForbidden = false
 }
 
 console.log('ok — all Er 0.4.3 harness checks passed in', root)
