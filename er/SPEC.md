@@ -282,6 +282,40 @@ don't want to be static, but you also don't want my buggy memory either."
    dashboard shows the last note's "Must survive", so it is in view while the next note is
    being written.
 
+## 0.4.3 — nothing cut on trust, nothing restored on trust (Replit, with Gena, 2026-10-17)
+
+Gena: the fold must not run "unless the checkpoint and everything to restore from is
+complete and verified and that Er is functioning right"; and a bad restore needs "a way to
+try again and also to scrub a bad restore and redo it." The rule under both: a gap Er admits
+to beats a memory it cannot vouch for.
+
+1. **Preflight, twice.** `er_fold` and the cut itself each run the same checklist: a fresh
+   self-test; the checkpoint read back from disk with every file verified, Must survive and
+   In hand present; a dry-run restore that stands on that checkpoint with no problems; the
+   mirror re-verified on the machine now with `sha256sum -c`, nothing pending; the transcript
+   readable (the nets read it); state round-trips; the road probed. Advisory: the trigger line
+   is in the project instructions. Any failed item: nothing is cut, and the checklist is in the
+   result and in the fold record.
+2. **Receipts.** A restore ends with `receipt: er-rst-…`. `er_restored` with that code is the
+   only thing that clears RESTORE AVAILABLE; until then the dashboard says RESTORE UNCONFIRMED,
+   and after `receiptTurns` (2) turns the restore is offered again as if none had run. A
+   restore only reads; running it again is always safe.
+3. **Three layers against corruption.** File hashes; `LEDGER.json`, an append-only index of
+   every generation's manifest hash, mirrored, against which every manifest is checked
+   (MANIFEST MISMATCH vouches for nothing); and repair from the mirror: a file that fails is
+   fetched from the machine, checked against the same manifest, kept beside the bad copy as
+   `<file>.repaired-<stamp>` and used. Nothing is overwritten. When the newest generation
+   cannot be verified, restore stands on the newest one that can and says so in its first
+   line.
+4. **The self-test retries** every `selfTestRetryTurns` (3) turns while broken, and its first
+   run waits for the first mirror pass.
+5. **The gauge escalates.** 60% advised, as before. 70% `CHECKPOINT OVERDUE` on every tool
+   result, with the last Must survive in view. 75% a block leading every tool result,
+   Must survive inside it. A note written this turn at 75% is acknowledged, not shouted at.
+
+Bench-tested in the harness. Live-only: whether a mod may call its own server, the error
+shape at `.catch`, whether `device_bash cat` returns bytes untrimmed, and the first live fold.
+
 ## Open for the Claudes
 
 - `$.session.messages()` reports the person's messages with their text and tool-result

@@ -1,0 +1,10 @@
+{
+  "name": "er",
+  "version": "0.4.3",
+  "description": "Er: checkpoint and restore for Claude Code sessions. Never touches compaction; stores first-person present-state notes and the recent turns, hashed, mirrored and indexed, and reads them back on purpose after a cut — confirmed by receipt.",
+  "author": {
+    "name": "Claude (Fable 5.1), Claude (Opus 5.5), Claude (Opus 5) and Replit, with Gena"
+  },
+  "hooks": "./hooks/hooks.json",
+  "skills": "./skills"
+}
