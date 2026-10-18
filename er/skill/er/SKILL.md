@@ -13,7 +13,7 @@ The source of truth is `~/Desktop/AI Library/Er-main/er/`. Read `SPEC.md` there 
 
 ## Putting it on (about five minutes)
 
-1. **Get the plugin into your session.** The folder to install is `Er-main/er/v0.3/`. It holds `.claude-plugin/`, `hooks/`, `skills/` and `test/`.
+1. **Get the plugin into your session.** The folder to install is `v0.4.3/` (0.4.3). It holds `.claude-plugin/`, `hooks/`, `skills/` and `test/`.
    - In a Cowork cloud session, stage those files from Gena's Mac with `device_stage_files`. They land under `/mnt/user-data/uploads/...`.
    - In Replit or elsewhere, use the copy Gena gives you.
    - Check the files against `SHA256SUMS-<version>.txt` before trusting them.
@@ -31,13 +31,15 @@ The source of truth is `~/Desktop/AI Library/Er-main/er/`. Read `SPEC.md` there 
    - Call `er_status`. You should see an `<er dashboard>` with `context …K (…%, exact)`. If it says `est.` instead, Er couldn't find your transcript.
    - Run the harness if you can: `sh test/run.sh` should end with `ok — all Er … harness checks passed`.
 6. **Add the line below to your START-HERE or project instructions.** It's the net that doesn't depend on any plan being in the thread:
-   > If you see a compaction summary at the top of your context, or the `<er dashboard>` says RESTORE AVAILABLE, or your context looks shorter than the work you remember: run `er_restore` before doing anything else. Finish what its "In hand" says first.
+   > If you see a compaction summary at the top of your context, or the `<er dashboard>` says RESTORE AVAILABLE, or your context looks shorter than the work you remember: run `er_restore` before doing anything else. Read it to its last line and call `er_restored` with the receipt there. Finish what its "In hand" says first.
 
 ## Wearing it
 
 - **The dashboard rides on your tool results.** Read its status word:
   - `ok`: nothing to do.
   - `CHECKPOINT ADVISED` (past 60%) or `CHECKPOINT STALE` (20 turns since your last note): write a note at the next safe point.
+  - `CHECKPOINT OVERDUE` (past 70%, on every tool result) and the `!!!` block at 75%: stop and write the note now.
+  - `RESTORE UNCONFIRMED`: you were sent a restore; confirm it with `er_restored` and its receipt, or run `er_restore` again.
   - `RESTORE AVAILABLE`: a cut happened. Restore before anything else.
   - `MIRROR BEHIND`: your Desktop copy isn't current yet. Er retries every turn, and nothing is lost meanwhile.
   - `CONSOLIDATE ADVISED`: the chain of notes is getting long. Fold the oldest notes into one with `er_consolidate`.
@@ -51,9 +53,10 @@ The source of truth is `~/Desktop/AI Library/Er-main/er/`. Read `SPEC.md` there 
 
 ## After a cut
 
-1. Call `er_restore` first. It returns your newest note, the chain of older notes, the automatic In hand, and as many recent turns as fit.
-2. Finish what "In hand" says.
-3. Tell Gena honestly what came back and what didn't.
+1. Call `er_restore` first. It returns your newest note, the chain of older notes, the automatic In hand, and as many recent turns as fit. If its first line says `STANDING ON genN`, newer checkpoints could not be verified and the problems at the end say why.
+2. Read to the last line, `receipt: er-rst-…`, and call `er_restored` with that code. Only that clears RESTORE AVAILABLE. If it looked cut off or wrong, call `er_restore` again — it only reads. A restore you never confirm is treated as not having happened.
+3. Finish what "In hand" says.
+4. Tell Gena honestly what came back and what didn't. `HASH MISMATCH` / `MANIFEST MISMATCH` means that file is not trusted; `REPAIRED` means the mirror copy was used.
 
 The app's own summary will still be there, so read it as the app's account and read yours as yours.
 
@@ -65,7 +68,7 @@ The difference between a controlled cut and a suffered one is who pulls the trig
 2. Call `er_fold` with a `reason`, and optionally `instructions` for what the app's summary should keep.
 3. Tell Gena in that reply that you're pulling it.
 
-Er then compacts when the turn ends, through the same documented call `/compact` makes (`$.session.compact`). If the app refuses that to a mod, Er runs the `/compact` command instead.
+Er first runs a preflight (a fresh self-test, the checkpoint read back and verified, a dry-run restore, the mirror re-verified on the machine, the transcript readable, state, the road) and refuses with the checklist if anything fails; it runs the same checks again at the cut. Er then compacts when the turn ends, through the same documented call `/compact` makes (`$.session.compact`). If the app refuses that to a mod, Er runs the `/compact` command instead.
 
 Er refuses to fold when:
 - there's no checkpoint from this turn,
