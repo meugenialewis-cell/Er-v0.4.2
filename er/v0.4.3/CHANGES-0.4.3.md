@@ -65,6 +65,27 @@ load for the session. Its first run waits (up to 20s) for a mirror pass in fligh
 v0.3, `skills/er-restore` says to read to the receipt, SPEC 0.4.3, README. `Er-main/` is
 flattened to the repo root.
 
+## 7. The punch list, closed the same day (Gena: "the best way to solve a problem is not to have it")
+- **Self-test forbidden ≠ self-test passed.** If the app refuses a mod calling its own server,
+  the dashboard still does not say BROKEN, but the fold's "Er answers" item FAILS and names the
+  way out: `requireSelfTest: false` in `er.config.json` (default true).
+- **A bridge that trims or adds a final newline** no longer defeats repair: the variant of the
+  returned text that hashes to the manifest is the file.
+- **`LEDGER.json` unreadable:** kept as `LEDGER.json.unreadable-<stamp>`, fetched from the mirror
+  (trusted as far as the mirror is: verified by hash when sent; accepted when it parses and every
+  generation it names is in this ledger), kept as `.repaired-<stamp>`, and the next checkpoint
+  carries every old row forward. An unreadable index is never mirrored over the good copy.
+- **`state.json` cut off midway:** `saveState` keeps the last good copy as `state.json.previous`
+  before every write; `loadState` falls back to it, keeps the bad file as `.unreadable-<stamp>`,
+  rewrites the live file, and the dashboard says so (`repaired: … state.json from its previous
+  copy at …`). Without this an empty state would silently forget a pending restore, the receipt
+  and the mirror queue.
+- **The at-the-cut mirror verification** gets 30s, the same as a request, so a slow moment on
+  the Wi-Fi aborts fewer folds.
+- Left as they are, on purpose: the 500ms timer between `turn.complete` and the fold (a cut the
+  app makes in that window is an ordinary unplanned one, covered by the nets); the receipt proves
+  the restore was read to the end, not that it was understood — that stays with the Claude.
+
 ## Not changed, on purpose
 - Auto-history keeps full windows (Gena: a few hundred KB per turn is fine).
 - 0.4.2's `.catch` handlers still read `(next as any).error` — the real error shape is a

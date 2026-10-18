@@ -22,5 +22,6 @@
   "overduePercent": 70,
   "alarmPercent": 75,
   "selfTestRetryTurns": 3,
-  "receiptTurns": 2
+  "receiptTurns": 2,
+  "requireSelfTest": true
 }
