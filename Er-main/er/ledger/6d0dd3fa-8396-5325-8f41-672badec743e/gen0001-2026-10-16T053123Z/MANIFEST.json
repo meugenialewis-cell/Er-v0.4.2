@@ -1,0 +1,19 @@
+{
+  "er": "0.1",
+  "generation": 1,
+  "thread": "6d0dd3fa-8396-5325-8f41-672badec743e",
+  "agent": "Claude (Fable 5.1)",
+  "at": "2026-10-16T05:31:23.769Z",
+  "turns": 40,
+  "tokenEstimate": 4233,
+  "files": {
+    "present-c.state.md": {
+      "sha256": "41e7480b4d83de38773d67767f6b96147948c26e1cec4dd9f30502fd9850d1bc",
+      "bytes": 3355
+    },
+    "recent.jsonl": {
+      "sha256": "72c9201776fd3fb98286c0cb3517412a73941f20b83d1b067f1f669dbc103b78",
+      "bytes": 13573
+    }
+  }
+}

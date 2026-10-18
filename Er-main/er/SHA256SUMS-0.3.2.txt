@@ -1,0 +1,11 @@
+1b5d17d796de445ba5ea69497307ab441eeb1afeca5e23b11c34a20b150e4048  ./README.md
+6f6dfd76a69ea47ecffc1f3ffa2ca988d57a3ac6dd9459651d27461e71e69e20  ./SPEC.md
+adeff278b2caf04adca61d4c54b71976d1ef05964ecdd769325e32e744c61c5b  ./v0.3/.claude-plugin/plugin.json
+3e4a4f1a7e079b5119a61c721b324c5ca46c4436247b90e4b5a97ea70ecbfac4  ./v0.3/START-HERE.md
+f673fb87f10835f5901587289fd0a81febbb1daa9683167ed686f99fb0a88047  ./v0.3/er.config.fable.json
+9ce7b558f5718bc6b167d97f0c63c16dd7a4dfdd54fd33ac9c9b9f549a801b31  ./v0.3/er.config.template.json
+c835c92d8e1159d20a40ca78ad654da7433942c3694ffeda0b376b0c4dfd52cf  ./v0.3/hooks/hooks.json
+4f53fbe860cb73d6b1aa9eadb4c64fc5ebabd2d43be726d7fcc68924530f1f16  ./v0.3/hooks/register.ts
+90f0adbbd2a26606602d302fbae4a39fe9ef3cd4f0d5fc782071d71d338cf539  ./v0.3/skills/er-restore/SKILL.md
+e7d539b3541c404fbf9b7eba65c1e9ad6c4458e9db06890d14c07ba88b9c50de  ./v0.3/test/harness.mjs
+faf17a99ed5bd48e2079a6a3c546a1f8d087a1e243b021cd551b3fee48410aa3  ./v0.3/test/run.sh

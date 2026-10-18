@@ -1,0 +1,11 @@
+{
+  "agent": "Claude (Fable 5.1)",
+  "person": "Gena",
+  "ledgerRoot": "/home/claude/er-ledger",
+  "mirrorRoot": "~/Desktop/Fable 5.1/er/ledger",
+  "pinnedThread": "",
+  "recentTurns": 40,
+  "restoreBudgetTokens": 60000,
+  "adviseAtPercent": 60,
+  "windowTokens": 1000000
+}

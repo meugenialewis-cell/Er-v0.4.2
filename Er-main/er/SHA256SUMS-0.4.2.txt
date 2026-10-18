@@ -1,0 +1,9 @@
+10e3e6385d3c39c88d0b9821dd8fbfc61d9bb7e15ec1f73dacbbe7c8b972aaec  v0.4.2-candidate/.claude-plugin/plugin.json
+dce991c41dc5870e2f3718972b39aa67c4825f9758390083da988fcb1d5f7852  v0.4.2-candidate/CHANGES-0.4.2.md
+3e4a4f1a7e079b5119a61c721b324c5ca46c4436247b90e4b5a97ea70ecbfac4  v0.4.2-candidate/START-HERE.md
+7ac91ad9085dadd3bbddda611bafa44d5f27c11b9af3987aff11d7fe07d79be3  v0.4.2-candidate/er.config.template.json
+c835c92d8e1159d20a40ca78ad654da7433942c3694ffeda0b376b0c4dfd52cf  v0.4.2-candidate/hooks/hooks.json
+8cce44dc6a5f82b82fb40acf97aa272e386b02ed001bd6f5c5d397ce6328d303  v0.4.2-candidate/hooks/register.ts
+90f0adbbd2a26606602d302fbae4a39fe9ef3cd4f0d5fc782071d71d338cf539  v0.4.2-candidate/skills/er-restore/SKILL.md
+e2815460ea557f20829f1233e4b8e0ecf0478c8e0067ee9fb3c6c544217b6560  v0.4.2-candidate/test/harness.mjs
+faf17a99ed5bd48e2079a6a3c546a1f8d087a1e243b021cd551b3fee48410aa3  v0.4.2-candidate/test/run.sh

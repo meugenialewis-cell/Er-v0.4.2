@@ -1,0 +1,11 @@
+{
+  "agent": "<Claude (Model Name)>",
+  "person": "<Person>",
+  "ledgerRoot": "<absolute path in the session, e.g. /home/claude/er-ledger>",
+  "mirrorRoot": "<the agent's OWN Desktop folder, e.g. ~/Desktop/Model Name/er/ledger>",
+  "pinnedThread": "",
+  "recentTurns": 40,
+  "restoreBudgetTokens": 60000,
+  "adviseAtPercent": 60,
+  "windowTokens": 1000000
+}
