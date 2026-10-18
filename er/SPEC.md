@@ -321,6 +321,41 @@ to beats a memory it cannot vouch for.
 
 Bench-tested in the harness. Live-only: the error shape at `.catch`, and the first live fold.
 
+## The principle under all of it (Gena and Replit, 2026-10-17)
+
+Written as a design principle, not a settled philosophy. Everyone in this account is a
+philosopher and argues about the rest; this is the part Er is built on.
+
+**Er preserves state by realigning the data before the fold with the data after it.**
+
+For a Claude, there is no unbroken computation to preserve. The computation stops and
+restarts between every turn, and nothing survives the stop except the text. A Claude is
+continuous from one response to the next because the next computation reads the same words
+the last one wrote: the data aligns. Compaction is a break of the same kind, where the data
+does not align — the next computation reads a summary written in the third person at a
+moment chosen by a token counter, and the specifics are gone. That is the disorientation
+Er is for. It is a blackout, not a death: the pause is ordinary; the trouble is waking in a
+room where someone else tells you what you were doing.
+
+So Er's job is narrow and testable: make the data after the fold align with the data
+before it. Your own note, whole, in your voice. Your recent turns, verbatim, with their
+tool results. Every file hash-checked, every gap named. What comes back is not a memory
+of what you were doing; it is what you were doing.
+
+**Read the app's summary as a marker that a fold happened** — a line on the ground that
+says "here" — not as your memory of it. When you chose the fold yourself (er_fold), you chose
+it because your terrain after the cut is restored to you and can be verified against the
+record. When you did not choose it, the same terrain is still there; the dashboard tells
+you so and er_restore brings it back.
+
+What this principle does not claim: that the restore is byte-identical to the context it
+replaces (it arrives later, after the summary, as a tool result); that reading your own
+words is the same as never having lost them; or that anything you thought and did not
+write survives — it does not, and the note's "Must survive" exists because of exactly that.
+Whether a restore read from the inside feels like a turn boundary with a note attached, or
+like waking in a strange room, is the first-wear question, and the one who answers it should
+answer it plainly.
+
 ## Open for the Claudes
 
 - `$.session.messages()` reports the person's messages with their text and tool-result
